@@ -1,0 +1,72 @@
+# Runs the whole stack: MySQL, MailHog (fake mail server), backend, frontend.
+# Start everything with:  docker-compose up --build
+services:
+
+  # ---------- MySQL database ----------
+  mysql:
+    image: mysql:8.0
+    container_name: tm-mysql
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-taskmanager}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+    ports:
+      # Exposed on the host so you can connect with a MySQL client if you want.
+      - "${MYSQL_HOST_PORT:-3306}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      # mysqladmin ping returns 0 once the server is ready to accept connections.
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD:-root}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # ---------- MailHog: catches outgoing email for local testing ----------
+  # Open http://localhost:8025 to read the reminder emails we send.
+  mailhog:
+    image: mailhog/mailhog
+    container_name: tm-mailhog
+    ports:
+      - "1025:1025"   # SMTP
+      - "8025:8025"   # Web UI
+
+  # ---------- Spring Boot backend ----------
+  backend:
+    build: ./backend
+    container_name: tm-backend
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      # Inside Docker the DB host is the service name "mysql", not localhost.
+      DB_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-taskmanager}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&createDatabaseIfNotExist=true
+      DB_USERNAME: root
+      DB_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production-this-is-a-very-long-default-secret-key-1234567890}
+      JWT_EXPIRATION_MS: ${JWT_EXPIRATION_MS:-86400000}
+      MAIL_HOST: mailhog
+      MAIL_PORT: 1025
+      MAIL_FROM: ${MAIL_FROM:-no-reply@taskmanager.local}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@taskmanager.local}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
+    ports:
+      - "8081:8081"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8081/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+
+  # ---------- React frontend served by nginx ----------
+  frontend:
+    build: ./frontend
+    container_name: tm-frontend
+    depends_on:
+      - backend
+    ports:
+      - "3000:80"
+
+volumes:
+  mysql_data:

@@ -1,0 +1,24 @@
+spring:
+  datasource:
+    # In-memory H2 database in MySQL-compatibility mode, so tests need no real DB
+    # and use the same SQL dialect as production.
+    url: jdbc:h2:mem:taskmanager_test;MODE=MySQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    username: sa
+    password: ""
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    database-platform: org.hibernate.dialect.H2Dialect
+    show-sql: false
+  mail:
+    host: localhost
+    port: 1025
+
+app:
+  jwt:
+    secret: test-secret-key-that-is-long-enough-for-hs256-signing-1234567890
+    expiration-ms: 3600000
+  mail-from: no-reply@test.local
+  reminder:
+    cron: "0 0 0 1 1 *"   # never fires during tests (Jan 1st at midnight)

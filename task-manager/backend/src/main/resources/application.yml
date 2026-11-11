@@ -1,0 +1,72 @@
+server:
+  port: ${SERVER_PORT:8081}
+
+spring:
+  application:
+    name: task-manager-backend
+
+  # ---------- Database (MySQL) ----------
+  # All values come from environment variables so we never hardcode secrets.
+  # The ${VAR:default} syntax means "use VAR, or this default if unset".
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3306/taskmanager?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&createDatabaseIfNotExist=true}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    hibernate:
+      # "update" auto-creates/updates tables from our @Entity classes.
+      # Great for learning; in real production you'd use Flyway/Liquibase.
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+
+  # ---------- Mail (used by the reminder scheduler) ----------
+  mail:
+    host: ${MAIL_HOST:localhost}
+    port: ${MAIL_PORT:1025}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: ${MAIL_SMTP_AUTH:false}
+          starttls:
+            enable: ${MAIL_SMTP_STARTTLS:false}
+
+# ---------- Our own settings ----------
+app:
+  # Secret used to sign JWTs. MUST be overridden in production via env var.
+  jwt:
+    secret: ${JWT_SECRET:change-me-in-production-this-is-a-very-long-default-secret-key-1234567890}
+    # Token lifetime in milliseconds (24 hours here).
+    expiration-ms: ${JWT_EXPIRATION_MS:86400000}
+  # Address the reminder emails are sent from.
+  mail-from: ${MAIL_FROM:no-reply@taskmanager.local}
+  reminder:
+    # Cron: run at minute 0 of every hour (Java uses 6 fields, not 5).
+    cron: ${REMINDER_CRON:0 0 * * * *}
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+# Expose only the health endpoint, which docker-compose uses as a health check.
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  health:
+    mail:
+      # The mail health check tries to open an SMTP connection; when the mail
+      # server is slow/down the whole health endpoint would report DOWN. We turn
+      # it off so the app's health reflects the app + database, not the mail server.
+      enabled: false
+
+logging:
+  level:
+    org.springframework.security: INFO
